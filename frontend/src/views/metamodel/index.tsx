@@ -9,6 +9,12 @@ const columns = [
   "对象名称",
   "属性名称",
   "属性值",
+  "字段类型",
+  "字段长度",
+  "业务含义",
+  "枚举说明",
+  "数据字典版本",
+  "发布批次",
   "技术负责人",
   "业务负责人",
   "更新周期"
@@ -16,6 +22,7 @@ const columns = [
 const actions = [
   "提交元数据评审",
   "发布元数据",
+  "同步元数据属性",
   "下线元数据"
 ]
 const statuses = [
@@ -73,11 +80,13 @@ export default function MetamodelView() {
     try {
       const response = await request(`${ENDPOINT}/${row.id}/actions`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ values: { action } }),
       })
-      if (!response.ok) {
-        throw new Error('元数据管理动作未生效，请稍后重试')
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message ?? '元数据管理动作未生效，请稍后重试')
       }
+      setErrorMessage(payload.message ?? '')
       await reload()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '元数据管理操作失败')

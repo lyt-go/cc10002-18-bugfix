@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import copy
+import threading
 from typing import Any
 
 from app.seed import SEED_ROWS
@@ -12,14 +14,27 @@ from app.seed import SEED_ROWS
 class Store:
     def __init__(self) -> None:
         self._tables: dict[str, list[dict[str, Any]]] = {
-            name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
+            name: copy.deepcopy(rows) for name, rows in SEED_ROWS.items()
         }
+        # 发布是「字典版本 + 元数据属性 + 发布批次 + 审计」的复合操作，
+        # 路由层是多线程执行的，必须把整段发布流程串行化。
+        self.lock = threading.RLock()
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
 
     def rows(self, module: str) -> list[dict[str, Any]]:
         return self._tables.setdefault(module, [])
+
+    def replace_rows(self, module: str, rows: list[dict[str, Any]]) -> None:
+        """整表替换：发布失败时用它把半成品回滚掉。"""
+        self._tables[module] = copy.deepcopy(list(rows))
+
+    def reset(self) -> None:
+        """恢复示例数据；测试与本地演示用，避免前一次发布污染后一次核对。"""
+        self._tables = {
+            name: copy.deepcopy(rows) for name, rows in SEED_ROWS.items()
+        }
 
     def find(self, module: str, entry_id: int) -> dict[str, Any] | None:
         for row in self.rows(module):

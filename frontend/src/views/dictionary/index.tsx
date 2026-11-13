@@ -16,7 +16,8 @@ const columns = [
 const actions = [
   "提交条目评审",
   "发布条目",
-  "作废条目"
+  "作废条目",
+  "修改条目"
 ]
 const statuses = [
   "草稿",
@@ -71,13 +72,24 @@ export default function DictionaryView() {
   async function runAction(action: string, row: Row) {
     setErrorMessage('')
     try {
+      const values: Record<string, string> = { action }
+      if (action === '修改条目') {
+        const current = String(row['枚举说明'] ?? '')
+        const next = window.prompt('新的枚举说明（发布后修改变更会生成新版本）', current)
+        if (next === null || next.trim() === '' || next === current) {
+          return
+        }
+        values['枚举说明'] = next.trim()
+      }
       const response = await request(`${ENDPOINT}/${row.id}/actions`, {
         method: 'POST',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ values }),
       })
-      if (!response.ok) {
-        throw new Error('数据字典动作未生效，请稍后重试')
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message ?? '数据字典动作未生效，请稍后重试')
       }
+      setErrorMessage(payload.message ?? '')
       await reload()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '数据字典操作失败')
